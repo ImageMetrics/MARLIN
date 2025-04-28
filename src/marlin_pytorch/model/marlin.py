@@ -42,8 +42,10 @@ class Marlin(Module):
         init_values: float,
         tubelet_size: int,
         as_feature_extractor: bool = True,
+        ffmpeg_dir: str = None
     ):
         super().__init__()
+        self.ffmpeg_dir = ffmpeg_dir
         self.encoder = MarlinEncoder(
             img_size=img_size,
             patch_size=patch_size,
@@ -150,7 +152,10 @@ class Marlin(Module):
         return features
 
     def _load_video(self, video_path: str, sample_rate: int, stride: int) -> Generator[Tensor, None, None]:
-        probe = ffmpeg.probe(video_path)
+        ffmpeg_cmd = 'ffprobe'
+        if self.ffmpeg_dir is not None:
+            ffmpeg_cmd = os.path.join(self.ffmpeg_dir, ffmpeg_cmd)
+        probe = ffmpeg.probe(video_path, cmd=ffmpeg_cmd)
         total_frames = int(probe["streams"][0]["nb_frames"])
         if total_frames <= self.clip_frames:
             video = read_video(video_path, channel_first=True) / 255  # (T, C, H, W)
