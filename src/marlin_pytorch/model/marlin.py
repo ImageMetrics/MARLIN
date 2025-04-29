@@ -179,7 +179,10 @@ class Marlin(Module):
             clip_start_indexes = list(range(0, total_frames - self.clip_frames * sample_rate, stride * sample_rate))
             clip_end_indexes = [i + self.clip_frames * sample_rate - 1 for i in clip_start_indexes]
 
+            clip_end_indexes = list(range(self.clip_frames // 2, total_frames + self.clip_frames // 2))
+
             current_index = -1
+            last_frame = None
             while True:
                 ret, frame = cap.read()
                 if not ret:
@@ -187,6 +190,11 @@ class Marlin(Module):
                 current_index += 1
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 frame = torch.from_numpy(frame).permute(2, 0, 1) / 255  # (C, H, W)
+                last_frame = frame
+
+                if current_index == 0:
+                    for _ in range(self.clip_frames // 2 - 1):
+                        deq.append(frame)
 
                 for _ in range(sample_rate - 1):
                     cap.read()
@@ -198,6 +206,11 @@ class Marlin(Module):
                     yield v.permute(1, 0, 2, 3).unsqueeze(0).to(self.device)
 
             cap.release()
+
+            for _ in range(self.clip_frames // 2):
+                deq.append(last_frame)
+                v = torch.stack(list(deq))  # (T, C, H, W)
+                yield v.permute(1, 0, 2, 3).unsqueeze(0).to(self.device)
 
     @classmethod
     def from_file(cls, model_name: str, path: str) -> "Marlin":
